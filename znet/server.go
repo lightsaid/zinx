@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
 	"net"
 )
@@ -25,6 +26,16 @@ func NewServer(name string) *Server {
 	return srv
 }
 
+// 暂时定义客户端的处理函数
+func CallBackClient(conn *net.TCPConn, data []byte, cnt int) error {
+	fmt.Println("callback handler")
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		fmt.Println("write back buf err ", err)
+		return errors.New("callback error")
+	}
+	return nil
+}
+
 // Start 启动服务
 func (s *Server) Start() {
 	// 整个Start过程启动一个协程来完成，不占用使用方主协程
@@ -46,6 +57,8 @@ func (s *Server) Start() {
 
 		fmt.Printf("start zinx %s server on %s:%d\n", s.Name, s.IP, s.Port)
 
+		var cid uint32 = 1
+
 		// 3. 等待接受网络连接
 		for {
 			conn, err := lis.AcceptTCP()
@@ -54,23 +67,30 @@ func (s *Server) Start() {
 				continue
 			}
 
+			// 创建 Connetion 来处理业务, TODO: 但是目前不能自定义回调函数
+			connection := NewConnection(conn, cid, CallBackClient)
+
+			// 启动链接Start函数处理业务
+			go connection.Start()
+
+			// v0.1
 			// 每一个连接单独开启一个协程处理业务
-			go func() {
-				// 不断从客户端循环读取数据
-				for {
-					buf := make([]byte, 1024)
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("read data failed: ", err)
-						continue
-					}
-					// 做一个简答，读到什么就回显什么
-					if _, err := conn.Write(buf[:cnt]); err != nil {
-						fmt.Println("write data failed: ", err)
-						continue
-					}
-				}
-			}()
+			// go func() {
+			// 	// 不断从客户端循环读取数据
+			// 	for {
+			// 		buf := make([]byte, 1024)
+			// 		cnt, err := conn.Read(buf)
+			// 		if err != nil {
+			// 			fmt.Println("read data failed: ", err)
+			// 			continue
+			// 		}
+			// 		// 做一个简答，读到什么就回显什么
+			// 		if _, err := conn.Write(buf[:cnt]); err != nil {
+			// 			fmt.Println("write data failed: ", err)
+			// 			continue
+			// 		}
+			// 	}
+			// }()
 		}
 	}()
 }
