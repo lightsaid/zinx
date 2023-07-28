@@ -10,20 +10,21 @@ import (
 // Connection 定义类型链接结构体
 // 当tcp accecpt 链接后,交由Connection对象处理业务
 type Connection struct {
-	Conn         *net.TCPConn    // 当前连接的 socket tcp 套接字
-	ConnID       uint32          // 每一个链接分配唯一ID（sessionId）
-	isClosed     bool            // 当前链接关闭状态
-	handleAPI    ziface.HandFunc // 该链接的处理方法api
-	ExitBuffChan chan bool       // 告知该链接已经退出/停止channel
+	Conn     *net.TCPConn // 当前连接的 socket tcp 套接字
+	ConnID   uint32       // 每一个链接分配唯一ID（sessionId）
+	isClosed bool         // 当前链接关闭状态
+	// handleAPI    ziface.HandFunc // 该链接的处理方法api
+	Router       ziface.IRouter // 处理当前链接方法的router，由server提供
+	ExitBuffChan chan bool      // 告知该链接已经退出/停止channel
 }
 
 // NewConnection 创建链接处理对象的方法
-func NewConnection(conn *net.TCPConn, connID uint32, callbackApi ziface.HandFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Connection {
 	c := &Connection{
 		Conn:         conn,
 		ConnID:       connID,
 		isClosed:     false,
-		handleAPI:    callbackApi,
+		Router:       router,
 		ExitBuffChan: make(chan bool),
 	}
 
@@ -40,20 +41,23 @@ func (c *Connection) StartReader() {
 
 	for {
 		buf := make([]byte, 1024)
-		cnt, err := c.Conn.Read(buf)
+		_, err := c.Conn.Read(buf)
 		if err != nil {
 			fmt.Println("read buf err: ", err)
 			c.ExitBuffChan <- true
 			continue
 		}
 
-		// 调用当前链接业务的处理方法
-		if err := c.handleAPI(c.Conn, buf, cnt); err != nil {
-			fmt.Println("connID: ", c.ConnID, " handle is error")
-			c.ExitBuffChan <- true
-			return
+		req := Request{
+			conn: c,
+			data: buf,
 		}
 
+		go func(request ziface.IRequest) {
+			c.Router.PreHandle(request)
+			c.Router.Handle(request)
+			c.Router.PostHandle(request)
+		}(&req)
 	}
 }
 
@@ -91,6 +95,11 @@ func (c *Connection) Stop() {
 	c.ExitBuffChan <- true
 
 	close(c.ExitBuffChan)
+}
+
+// GetTCPConnection 从当前连接获取原始的socket TCPConn
+func (c *Connection) GetTCPConnection() *net.TCPConn {
+	return c.Conn
 }
 
 // GetConnID 获取当前链接ID

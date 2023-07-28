@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	"github.com/lightsaid/zinx/ziface"
 )
 
 // Server 实现IServer接口的服务类
@@ -12,6 +14,9 @@ type Server struct {
 	IPVersion string // tcp，协议名称
 	IP        string // ip地址
 	Port      int    // 绑定服务的端口
+
+	// 给当前Server由用户绑定的回调router,也就是Server注册的链接对应的处理业务
+	Router ziface.IRouter
 }
 
 // NewServer 创建一个服务
@@ -21,6 +26,7 @@ func NewServer(name string) *Server {
 		IPVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      8000,
+		Router:    nil,
 	}
 
 	return srv
@@ -68,7 +74,7 @@ func (s *Server) Start() {
 			}
 
 			// 创建 Connetion 来处理业务, TODO: 但是目前不能自定义回调函数
-			connection := NewConnection(conn, cid, CallBackClient)
+			connection := NewConnection(conn, cid, s.Router)
 
 			// 启动链接Start函数处理业务
 			go connection.Start()
@@ -93,6 +99,12 @@ func (s *Server) Start() {
 			// }()
 		}
 	}()
+}
+
+// AddRouter 注册路由到Server上，提供给Connection使用
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
+	fmt.Println("add router success!")
 }
 
 // Stop 停止服务
