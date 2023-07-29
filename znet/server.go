@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/lightsaid/zinx/utils"
 	"github.com/lightsaid/zinx/ziface"
 )
 
@@ -20,12 +21,16 @@ type Server struct {
 }
 
 // NewServer 创建一个服务
-func NewServer(name string) *Server {
+func NewServer() *Server {
+
+	// 先初始化全局配置文件
+	utils.GlobalObject.Reload()
+
 	srv := &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8000,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
 		Router:    nil,
 	}
 
@@ -44,6 +49,9 @@ func CallBackClient(conn *net.TCPConn, data []byte, cnt int) error {
 
 // Start 启动服务
 func (s *Server) Start() {
+
+	fmt.Printf("Global config: %v\n", utils.GlobalObject)
+
 	// 整个Start过程启动一个协程来完成，不占用使用方主协程
 	go func() {
 

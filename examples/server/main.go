@@ -36,7 +36,7 @@ func (mr *MyRouter) PostHandle(req ziface.IRequest) {
 }
 
 func main() {
-	srv := znet.NewServer("example_zinx")
+	srv := znet.NewServer()
 	// 注册业务处理函数
 	srv.AddRouter(&MyRouter{})
 	// 运行服务
